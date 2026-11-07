@@ -16,10 +16,10 @@ function leaves(schema: Schema, path = ''): Array<[string, Schema]> {
 }
 
 describe('插件配置', () => {
-  it('包元数据的服务声明与入口 inject 一致，过滤与唤醒用的服务只作为可选服务出现', () => {
+  it('包元数据的服务声明与入口 inject 一致，过滤、唤醒与读取会话图片用的服务只作为可选服务出现', () => {
     const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8'))
     expect(manifest.cordis.service.required).toEqual(inject)
-    expect(manifest.cordis.service.optional).toEqual(['agents', 'chat'])
+    expect(manifest.cordis.service.optional).toEqual(['agents', 'chat', 'chatluna_storage'])
     expect(manifest.license).toBe('MIT')
   })
 

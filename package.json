@@ -43,15 +43,18 @@
     "test": "vitest run"
   },
   "peerDependencies": {
+    "@chatluna/message": ">=2.0.0-alpha.0",
     "@chatluna/schema": ">=2.0.0-alpha.0",
     "cordis": "^4.0.0-rc.12"
   },
   "devDependencies": {
     "@chatluna/agent": "workspace:*",
     "@chatluna/chat": "workspace:*",
+    "@chatluna/message": "workspace:*",
     "@chatluna/prompt": "workspace:*",
     "@chatluna/satori": "workspace:*",
     "@chatluna/schema": "workspace:*",
+    "@chatluna/storage-files": "workspace:*",
     "@chatluna/tool": "workspace:*",
     "@satorijs/core": "~4.6.1",
     "cordis": "4.0.0-rc.12",
@@ -70,7 +73,8 @@
       ],
       "optional": [
         "agents",
-        "chat"
+        "chat",
+        "chatluna_storage"
       ]
     }
   }

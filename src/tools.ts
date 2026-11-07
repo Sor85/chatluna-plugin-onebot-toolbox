@@ -3,6 +3,9 @@ import type { Bot } from '@satorijs/core'
 import { Schema } from '@chatluna/schema'
 import type { ToolCallContext, ToolDefinition } from '@chatluna/tool'
 import type { Agent } from '@chatluna/agent'
+import type { ChatFileBlock, ChatMessage } from '@chatluna/message'
+import { fileRefTableOf } from '@chatluna/message'
+import type {} from '@chatluna/storage-files'
 import type {} from '@chatluna/tool'
 import type { Config, NativeToolKey, OneBotProtocol } from './config'
 import { NATIVE_TOOL_KEYS, NATIVE_TOOLS } from './config'
@@ -20,10 +23,13 @@ import {
 
 /** 工具执行时的上下文：会话所在的机器人与群。 */
 export interface ToolScope {
+  ctx: Context
   bot: Bot
   /** 会话所在群；私聊为 undefined。 */
   guildId?: string
   protocol: OneBotProtocol
+  /** 发起调用的 agent（`call.agent`），用来在会话日志里解析图片 ref；脱离会话的调用没有。 */
+  agent?: object
 }
 
 interface NativeTool<A> {
@@ -51,16 +57,69 @@ function required(value: string, name: string): string {
 
 const GENDERS = { unknown: '0', male: '1', female: '2' }
 
+const STORAGE_PREFIX = 'storage://'
+/** v2 给模型的文件占位符 `<img ref="i…"/>`：`i` 加内容哈希的最短唯一前缀（至少 6 位）。 */
+const FILE_REF = /^i[0-9a-f]{6,}$/
+
+const base64File = (buffer: Buffer) => `base64://${buffer.toString('base64')}`
+
 /** HTTP/HTTPS 图片先读成 base64：OneBot 端常访问不到临时 URL，或 URL 在提交前就已过期。 */
-async function avatarFile(imageUrl: string): Promise<string> {
-  if (!/^https?:\/\//i.test(imageUrl)) return imageUrl
+async function remoteFile(url: string): Promise<string> {
   try {
-    const response = await fetch(imageUrl)
+    const response = await fetch(url)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return `base64://${Buffer.from(await response.arrayBuffer()).toString('base64')}`
+    return base64File(Buffer.from(await response.arrayBuffer()))
   } catch (error) {
     throw new Error(`无法读取头像图片：${error instanceof Error ? error.message : String(error)}`)
   }
+}
+
+/** 入站图片由 v2 下载进 `chatluna_storage`，24 小时后过期；没装存储插件时会话里只有 url 或 data 块。 */
+async function storageFile(ctx: Context, reference: string): Promise<string> {
+  const storage = ctx.get('chatluna_storage')
+  if (!storage) throw new Error(`Cannot read ${reference}: the chatluna_storage service is not loaded.`)
+  const file = await storage.getTempFile(reference.slice(STORAGE_PREFIX.length))
+  if (!file) throw new Error(`${reference} is not in storage (it may have expired).`)
+  return base64File(await file.data)
+}
+
+function dataFile(data: string): string {
+  if (!data.startsWith('data:')) return `base64://${data}`
+  const comma = data.indexOf(',')
+  const body = data.slice(comma + 1)
+  return data.slice(0, comma).endsWith(';base64') ? `base64://${body}` : base64File(Buffer.from(decodeURIComponent(body)))
+}
+
+function messagesOf(agent: object | undefined): readonly ChatMessage[] | undefined {
+  const session: unknown = agent && 'session' in agent ? agent.session : undefined
+  if (session === null || typeof session !== 'object' || !('messages' in session) || typeof session.messages !== 'function') return undefined
+  return session.messages() as readonly ChatMessage[]
+}
+
+/**
+ * v2 不把聊天图片的地址交给模型，只给 `<img ref="i…"/>`，ref 要在发起调用的 agent 的会话日志里按内容哈希解析
+ * （与 v2 自带的 `look` 工具、出站 `<img ref>` 同一张表）。
+ */
+async function sessionImageFile(scope: ToolScope, ref: string): Promise<string> {
+  const messages = messagesOf(scope.agent)
+  if (!messages) throw new Error(`Image ref ${ref} can only be resolved inside a conversation.`)
+  const block: ChatFileBlock | undefined = fileRefTableOf(messages).resolve(ref)
+  if (!block) throw new Error(`Image ref ${ref} is not in this conversation.`)
+  if (!block.mediaType.startsWith('image/')) throw new Error(`ref ${ref} is ${block.mediaType}, not an image.`)
+  // 用原图 data，不用写入时压缩的 preview。
+  const { data } = block
+  if (data.type === 'data') return dataFile(data.data)
+  if (data.type === 'url') return remoteFile(data.url)
+  if (data.type === 'reference' && data.reference.startsWith(STORAGE_PREFIX)) return storageFile(scope.ctx, data.reference)
+  throw new Error(`Image ref ${ref} cannot be read.`)
+}
+
+/** 头像来源：会话图片 ref、`storage://`、HTTP/HTTPS 图片都先读成 base64 再提交，其余（OneBot 端可读的本地路径）原样提交。 */
+async function avatarFile(scope: ToolScope, image: string): Promise<string> {
+  if (FILE_REF.test(image)) return sessionImageFile(scope, image)
+  if (image.startsWith(STORAGE_PREFIX)) return storageFile(scope.ctx, image)
+  if (/^https?:\/\//i.test(image)) return remoteFile(image)
+  return image
 }
 
 function formatMember(index: number, member: MemberInfo): string {
@@ -87,11 +146,11 @@ export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any
   },
   setQQAvatar: {
     args: Schema.args({
-      imageUrl: Schema.string().min(1).description('Image URL or local file path readable by the OneBot side.'),
+      imageUrl: Schema.string().min(1).description('The image: the ref attribute of an `<img ref="i…"/>` in this conversation, an HTTP/HTTPS URL, or a local file path readable by the OneBot side.'),
     }),
     effect: 'write',
     async run(scope, args: { imageUrl: string }) {
-      const file = await avatarFile(required(args.imageUrl, 'imageUrl'))
+      const file = await avatarFile(scope, required(args.imageUrl, 'imageUrl'))
       await callOneBot(scope.bot, 'set_qq_avatar', { file })
       return 'QQ 头像已更新。'
     },
@@ -235,7 +294,7 @@ export function nativeToolDefinitions(ctx: Context, config: Config, log: Logger)
         const bot = oneBotOf(ctx, location?.platform, location?.selfId)
         if (!bot) throw new Error('This tool only supports OneBot platform.')
         try {
-          const result = await tool.run({ bot, guildId: location?.isDirect ? undefined : location?.guild, protocol: config.oneBotProtocol }, args)
+          const result = await tool.run({ ctx, bot, guildId: location?.isDirect ? undefined : location?.guild, protocol: config.oneBotProtocol, ...(call.agent ? { agent: call.agent } : {}) }, args)
           log.debug('%s: %s', name, result)
           return result
         } catch (error) {

@@ -53,7 +53,7 @@ export const NATIVE_TOOLS: Record<NativeToolKey, NativeToolInfo> = {
   },
   setQQAvatar: {
     toolName: 'set_qq_avatar',
-    description: '修改机器人 QQ 头像。提供 imageUrl；HTTP/HTTPS 图片会先由插件读取并转为 OneBot base64 文件，避免临时 URL 过期或 OneBot 端无法访问。',
+    description: '修改机器人 QQ 头像。imageUrl 填会话里图片的 ref（`<img ref="i…"/>` 的 ref 属性）、HTTP/HTTPS 链接或 OneBot 端可读的本地路径；会话图片与 HTTP/HTTPS 图片会先由插件读取并转为 OneBot base64 文件，避免临时 URL 过期或 OneBot 端无法访问。',
   },
   setGroupCard: {
     toolName: 'set_group_card',

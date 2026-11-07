@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { fileRefTableOf, type ChatFileBlock, type ChatMessage } from '@chatluna/message'
 import { createBot, createHost, failure, groupLocation } from './helpers/host'
 
 async function call(ctx: Awaited<ReturnType<typeof createHost>>['ctx'], name: string, args: Record<string, unknown>, location: Record<string, unknown> = groupLocation) {
@@ -57,6 +58,37 @@ describe('原生工具调用', () => {
     }
     expect(bot.requests).toEqual([
       ['set_qq_avatar', { file: '/tmp/a.png' }],
+      ['set_qq_avatar', { file: 'base64://AQID' }],
+    ])
+  })
+
+  it('修改头像：会话图片按 ref 在 agent 的会话日志里解析，存储里的原图读成 base64', async () => {
+    const { ctx, bot } = await createHost()
+    ctx.provide('chatluna_storage')
+    ctx.set('chatluna_storage', {
+      getTempFile: async (id: string) => (id === 'stored' ? { data: Promise.resolve(Buffer.from([1, 2, 3])) } : null),
+    } as never)
+    const stored: ChatFileBlock = { type: 'file', mediaType: 'image/png', data: { type: 'reference', reference: 'storage://stored' }, preview: { type: 'data', data: 'cHJldmlldw==' } }
+    const expired: ChatFileBlock = { type: 'file', mediaType: 'image/png', data: { type: 'reference', reference: 'storage://gone' } }
+    const inline: ChatFileBlock = { type: 'file', mediaType: 'image/jpeg', data: { type: 'data', data: 'data:image/jpeg;base64,BAUG' } }
+    const audio: ChatFileBlock = { type: 'file', mediaType: 'audio/ogg', data: { type: 'data', data: 'AAAA' } }
+    const messages = [{ id: 'm1', role: 'user', content: [stored, expired, { type: 'envelope', kind: 'message', id: 'e1', content: [inline, audio] }] }] as unknown as ChatMessage[]
+    const refs = fileRefTableOf(messages)
+    const agent = { options: {}, session: { messages: () => messages } }
+    const avatar = (imageUrl: string, withAgent = true) =>
+      ctx.tools.execute({ name: 'set_qq_avatar', args: { imageUrl }, location: groupLocation, ...(withAgent ? { agent } : {}) })
+
+    expect(textOf(await avatar(refs.refOf(stored)))).toBe('QQ 头像已更新。')
+    expect(textOf(await avatar(refs.refOf(inline)))).toBe('QQ 头像已更新。')
+    expect(textOf(await avatar('storage://stored'))).toBe('QQ 头像已更新。')
+    expect(textOf(await avatar(refs.refOf(expired)))).toContain('storage://gone is not in storage')
+    expect(textOf(await avatar(refs.refOf(audio)))).toContain('not an image')
+    expect(textOf(await avatar('iffffff0'))).toContain('is not in this conversation')
+    expect(textOf(await avatar(refs.refOf(stored), false))).toContain('can only be resolved inside a conversation')
+    // 用原图，不用写入时压缩的 preview。
+    expect(bot.requests).toEqual([
+      ['set_qq_avatar', { file: 'base64://AQID' }],
+      ['set_qq_avatar', { file: 'base64://BAUG' }],
       ['set_qq_avatar', { file: 'base64://AQID' }],
     ])
   })

@@ -1,6 +1,6 @@
 # chatluna-plugin-onebot-toolbox
 
-ChatLuna v2 插件：为 ChatLuna 提供 OneBot（QQ）原生工具与群聊信息变量，仅支持 OneBot 平台（NapCat、LLBot、SnowLuma）。由 Koishi 插件 `koishi-plugin-chatluna-toolbox` 迁移而来。
+ChatLuna v2 插件：为 ChatLuna 提供 OneBot（QQ）原生工具与群聊信息变量，仅支持 OneBot 平台（NapCat、LLBot、SnowLuma）。
 
 ## 功能
 
@@ -23,8 +23,7 @@ ChatLuna v2 插件：为 ChatLuna 提供 OneBot（QQ）原生工具与群聊信�
 - QQ 头像工具接受会话里的图片（聊天中发送的图片可直接设为头像）、HTTP/HTTPS 链接或 OneBot 端可读的本地路径；会话图片与 HTTP/HTTPS 图片先读成 OneBot `base64://` 文件再提交，避免 OneBot 端访问不到临时图片地址。会话图片从 ChatLuna 的文件存储读取，存储中的临时文件过期后需重新发送。
 - SnowLuma 同意好友申请时不读取备注，插件在同意后另用 `set_friend_remark` 设置；它的消息 ID 常为负数，撤回消息工具按原样提交。
 - 收到好友申请、加群申请或群邀请时插件会唤醒对应会话，把申请 flag 告诉模型，由 `handle_request` 处理：好友申请与群邀请发往申请人的私聊，加群申请发往所申请的群。在 ChatLuna 工具管理中禁用 `handle_request` 后不再唤醒；也可在设置中单独关闭「申请通知」。
-- 戳一戳、消息表情回应与禁言由 ChatLuna v2 自带的 OneBot 动作（`<poke/>`、`<react/>`、`<mute/>`）提供，本插件不再重复实现。
-- 工具默认对所有用户开放，与原插件一致；如需收紧，在 ChatLuna 的权限页按 `tool:<工具名>` 设置。
+- 工具默认对所有用户开放；如需收紧，在 ChatLuna 的权限页按 `tool:<工具名>` 设置。
 
 ### 变量
 
@@ -35,9 +34,7 @@ ChatLuna v2 插件：为 ChatLuna 提供 OneBot（QQ）原生工具与群聊信�
 - `{groupInfo}`：群名、群号、成员数量、创建时间、群主与管理员名单
 - `{groupShutList}`：当前群被禁言的成员与解除时间（缓存 15 秒）
 
-这些变量随群聊状态变化，只能写在预设的上下文或输入区，不能写在 system 区；v1 格式的预设由 ChatLuna 自动迁移。随机数使用 ChatLuna 自带的 `{random(最小值, 最大值)}`。
-
-原插件的 Character XML 工具不再提供：ChatLuna v2 的角色引擎已经原生支持这类动作。
+这些变量随群聊状态变化，只能写在预设的上下文或输入区，不能写在 system 区。
 
 ## 安装
 

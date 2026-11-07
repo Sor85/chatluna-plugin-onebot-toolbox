@@ -30,7 +30,7 @@ ChatLuna v2 外部插件：为 ChatLuna 提供 OneBot 原生工具与群聊信�
 - 头像工具的图片来源：v2 不把聊天图片的地址交给模型，只给 `<img ref="i…"/>` 占位符，所以 `imageUrl` 除了 HTTP/HTTPS 与本地路径还接受 ref。ref 用 `@chatluna/message` 的 `fileRefTableOf(call.agent.session.messages()).resolve(ref)` 解析（与 v2 的 `look` 工具同一张表，这是唯一的值导入依赖，因此进 peerDependencies），取原图 `data` 而不是 `preview`；`storage://` 引用经可选服务 `chatluna_storage` 的 `getTempFile` 读出字节，不写进 `inject`（没装存储插件时会话里只有 url 或 data 块）。读出的图片一律转成 `base64://` 提交。
 - 变量都声明为 `mutable: true`：随群聊状态变化，写在 system 区会报 `MutableVariableError`。provider 拿不到 Session，只有 `PromptEnvironment`；群聊里 `env.userId` 只来自本步最新的用户消息，退回 `env.message.senderId`。变量名被其他插件占用时只跳过该变量并记 warn。
 - 申请通知：v2 不把 OneBot 申请事件交给模型，`handle_request` 拿不到 flag 就无法使用，所以在 `requestNotice` 打开时经 `chat.wake` 以路由身份唤醒（会话不存在时新开）。唤醒前用不带 agent 的 `tools.list()` 确认 `handle_request` 仍可见：v2 工具管理页的禁用由 `@chatluna/tool-policy` 落成全局 `exclude` 过滤，工具被禁用时不唤醒，免得模型去调一个用不了的工具；按路由或 agent 收窄的工具范围在唤醒前拿不到 agent，不在此判断。好友申请与群邀请发往申请人的私聊，加群申请发往所申请的群；路由关闭或没选模型时 `wake` 报错，只记调试日志。
-- 配置不另做 WebUI 页面，也不在侧栏加入口：v2 插件设置页直接渲染 `Config`。SchemaForm 只认字符串文案，所以配置文案只有中文；顶层每组用 `.description()` 出小节标题，每个字段都写 `extra('label')`，说明不以句号结尾，反引号前后不加空格（`tests/config.test.ts`）。插件页的「使用说明」标签显示 README，配置项之外的说明（变量用法、随机数改用 v2 自带的 `random`）写在 README 里。
+- 配置不另做 WebUI 页面，也不在侧栏加入口：v2 插件设置页直接渲染 `Config`。SchemaForm 只认字符串文案，所以配置文案只有中文；顶层每组用 `.description()` 出小节标题，每个字段都写 `extra('label')`，说明不以句号结尾，反引号前后不加空格（`tests/config.test.ts`）。插件页的「使用说明」标签显示 README，配置项之外的说明（变量用法）写在 README 里。
 
 ## 命令
 

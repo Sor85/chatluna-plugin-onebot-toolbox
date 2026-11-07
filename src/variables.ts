@@ -1,7 +1,6 @@
 import type { Context } from 'cordis'
 import type { Bot } from '@satorijs/core'
 import type { PromptEnvironment, VariableDeclaration, VariableProvider } from '@chatluna/prompt'
-import type {} from '@chatluna/prompt'
 import type { Config, GroupInfoItem, MemberInfoItem, OneBotProtocol } from './config'
 import { DEFAULT_GROUP_INFO_ITEMS } from './config'
 import type { Logger } from './logger'

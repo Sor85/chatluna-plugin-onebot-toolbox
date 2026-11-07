@@ -1,6 +1,5 @@
 import type { Context } from 'cordis'
 import type { Bot } from '@satorijs/core'
-import type {} from '@satorijs/core'
 
 /** Koishi OneBot 适配器的原始请求：返回完整的响应包，业务失败也照常 resolve。 */
 export interface OneBotInternal {
@@ -38,13 +37,7 @@ export async function callOneBot(bot: Bot, action: string, params: Record<string
   if (!failed) return envelope.data
   const reason = envelope.wording || envelope.message || envelope.status
   const retcode = typeof envelope.retcode === 'number' ? ` (retcode: ${envelope.retcode})` : ''
-  throw new OneBotError(`${reason ? String(reason) : 'OneBot returned failed'}${retcode}`, envelope)
-}
-
-export class OneBotError extends Error {
-  constructor(message: string, readonly envelope: OneBotEnvelope) {
-    super(message)
-  }
+  throw new Error(`${reason ? String(reason) : 'OneBot returned failed'}${retcode}`)
 }
 
 /**

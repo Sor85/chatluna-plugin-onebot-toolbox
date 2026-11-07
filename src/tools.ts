@@ -6,7 +6,6 @@ import type { Agent } from '@chatluna/agent'
 import type { ChatFileBlock, ChatMessage } from '@chatluna/message'
 import { fileRefTableOf } from '@chatluna/message'
 import type {} from '@chatluna/storage-files'
-import type {} from '@chatluna/tool'
 import type { Config, NativeToolKey, OneBotProtocol } from './config'
 import { NATIVE_TOOL_KEYS, NATIVE_TOOLS } from './config'
 import type { Logger } from './logger'
@@ -294,7 +293,7 @@ export function nativeToolDefinitions(ctx: Context, config: Config, log: Logger)
         const bot = oneBotOf(ctx, location?.platform, location?.selfId)
         if (!bot) throw new Error('This tool only supports OneBot platform.')
         try {
-          const result = await tool.run({ ctx, bot, guildId: location?.isDirect ? undefined : location?.guild, protocol: config.oneBotProtocol, ...(call.agent ? { agent: call.agent } : {}) }, args)
+          const result = await tool.run({ ctx, bot, guildId: location?.isDirect ? undefined : location?.guild, protocol: config.oneBotProtocol, agent: call.agent }, args)
           log.debug('%s: %s', name, result)
           return result
         } catch (error) {

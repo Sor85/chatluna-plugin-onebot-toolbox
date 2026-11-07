@@ -6,14 +6,10 @@ import { registerNativeTools } from './tools'
 import { registerVariables } from './variables'
 
 export * from './config'
-export * from './onebot'
-export * from './requests'
-export * from './tools'
-export * from './variables'
 
 export const name = 'chatluna-onebot-toolbox'
 
-/** 过滤工具用的 agents 与唤醒用的 chat 是可选服务。 */
+/** 过滤工具用的 agents、唤醒用的 chat 与读取会话图片用的 chatluna_storage 是可选服务。 */
 export const inject = ['satori', 'tools', 'prompt']
 
 export function apply(ctx: Context, config: Config) {

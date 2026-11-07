@@ -36,7 +36,7 @@ export function requestReason(session: Session, kind: RequestKind, toolName: str
 }
 
 /**
- * v2 不把 OneBot 的申请事件交给模型，「处理好友与群申请」工具拿不到 flag 就无从调用，
+ * v2 不把 OneBot 的申请事件交给模型，`handle_request` 拿不到 flag 就无从调用，
  * 所以把申请转成一次唤醒；工具在 v2 工具管理里被禁用时跟着不唤醒。会话所在路由关闭或没选模型时 `wake` 会报错，只记调试日志。
  */
 export function registerRequestNotices(ctx: Context, config: Config, log: Logger) {

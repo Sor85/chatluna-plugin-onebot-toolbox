@@ -22,9 +22,6 @@ export function createBot(selfId = '10000', responders: Record<string, Responder
         return data instanceof Envelope ? data.value : { status: 'ok', retcode: 0, data }
       },
     },
-    async getGuildMember(_guildId: string, userId: string) {
-      return { user: { id: userId, name: `name-${userId}` } }
-    },
   }
   return bot
 }

@@ -37,7 +37,7 @@ export function requestReason(session: Session, kind: RequestKind, toolName: str
 
 /**
  * v2 不把 OneBot 的申请事件交给模型，「处理好友与群申请」工具拿不到 flag 就无从调用，
- * 所以把申请转成一次唤醒。会话所在路由关闭或没选模型时 `wake` 会报错，只记调试日志。
+ * 所以把申请转成一次唤醒；工具在 v2 工具管理里被禁用时跟着不唤醒。会话所在路由关闭或没选模型时 `wake` 会报错，只记调试日志。
  */
 export function registerRequestNotices(ctx: Context, config: Config, log: Logger) {
   if (!config.requestNotice) return
@@ -47,6 +47,8 @@ export function registerRequestNotices(ctx: Context, config: Config, log: Logger
       if (session.platform !== 'onebot') return
       // 没有 flag 时模型无从处理申请，唤醒只会让它拿空值反复试错。
       if (!session.messageId) return log.debug('%s request without flag ignored', kind)
+      // 工具在 v2 工具管理里被禁用时（全局过滤排除了它）不唤醒：模型调用不到，唤醒只会让它白跑一轮。
+      if (!inner.tools.list().some((tool) => tool.name === toolName)) return log.debug('%s request ignored: %s is disabled', kind, toolName)
       const target = requestTarget(session, kind)
       if (!target) return
       inner.chat.wake(target, { reason: requestReason(session, kind, toolName), by: 'onebot-toolbox' })

@@ -120,7 +120,7 @@ const basicFields = {
   ]).default('napcat').role('radio').extra('label', 'OneBot 协议')
     .description('按所选实现调整请求参数：LLBot 不支持设置性别，群禁言列表的群号类型也不同；SnowLuma 同意好友申请后另行设置备注'),
   requestNotice: Schema.boolean().default(true).extra('label', '申请通知')
-    .description('收到好友申请、加群申请或群邀请时唤醒对应会话，把申请 flag 告诉模型，供`handle_request`工具处理。好友申请与群邀请发往申请人的私聊，加群申请发往所申请的群'),
+    .description('收到好友申请、加群申请或群邀请时唤醒对应会话，把申请 flag 告诉模型，供`handle_request`工具处理。好友申请与群邀请发往申请人的私聊，加群申请发往所申请的群；该工具在工具管理中禁用时不唤醒'),
 }
 
 const variableFields = {

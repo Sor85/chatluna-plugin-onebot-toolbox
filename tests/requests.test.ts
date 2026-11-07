@@ -49,6 +49,17 @@ describe('申请通知', () => {
     expect(wakes).toEqual([])
   })
 
+  it('处理申请工具在 v2 工具管理里被禁用时不唤醒，重新启用后恢复', async () => {
+    const { ctx, wakes } = await hostWithChat({})
+    // 工具管理页的禁用由 @chatluna/tool-policy 落成一层全局 exclude 过滤。
+    const enable = ctx.tools.filter({ exclude: ['handle_request'] })
+    ctx.emit('friend-request', requestSession(ctx, 'friend-request', { userId: '1', flag: 'f-1' }))
+    expect(wakes).toEqual([])
+    enable()
+    ctx.emit('friend-request', requestSession(ctx, 'friend-request', { userId: '1', flag: 'f-2' }))
+    expect(wakes).toHaveLength(1)
+  })
+
   it('关闭申请通知时不唤醒', async () => {
     const { ctx, wakes } = await hostWithChat({ requestNotice: false })
     ctx.emit('friend-request', requestSession(ctx, 'friend-request', { userId: '1', flag: 'f-1' }))

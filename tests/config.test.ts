@@ -30,7 +30,7 @@ describe('插件配置', () => {
     expect(leaves(Config).map(([key]) => key).filter((key) => /tool/i.test(key))).toEqual([])
   })
 
-  it('默认值与源插件一致：NapCat 协议、变量名不变，申请通知默认打开', () => {
+  it('默认使用 NapCat 和四个变量名称，并打开申请通知', () => {
     const config = Config({})
     expect(config.oneBotProtocol).toBe('napcat')
     expect([config.userInfo.variableName, config.botInfo.variableName, config.groupInfo.variableName, config.groupShutList.variableName])

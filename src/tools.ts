@@ -12,9 +12,7 @@ import type { Logger } from './logger'
 import {
   asMembers,
   callOneBot,
-  memberCard,
-  memberNickname,
-  memberUserId,
+  pickText,
   numericId,
   oneBotOf,
   type MemberInfo,
@@ -122,7 +120,7 @@ async function avatarFile(scope: ToolScope, image: string): Promise<string> {
 }
 
 function formatMember(index: number, member: MemberInfo): string {
-  return `${index}. qqid：${memberUserId(member) || '未知'}，群昵称：${memberCard(member) || '无'}，QQ昵称：${memberNickname(member) || '无'}`
+  return `${index}. qqid：${pickText(member.user_id) || '未知'}，群昵称：${pickText(member.card) || '无'}，QQ昵称：${pickText(member.nickname) || '无'}`
 }
 
 export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any> } = {
@@ -184,8 +182,8 @@ export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any
       const byQQ = mode === 'byQQ' || (mode === 'auto' && /^\d+$/.test(query))
       const keyword = query.toLowerCase()
       const matches = members.filter((member) => byQQ
-        ? memberUserId(member) === query
-        : [memberCard(member), memberNickname(member)].some((name) => name && name.toLowerCase().includes(keyword)))
+        ? pickText(member.user_id) === query
+        : [pickText(member.card), pickText(member.nickname)].some((name) => name && name.toLowerCase().includes(keyword)))
       if (!matches.length) return '未找到匹配的群成员。'
       const header = matches.length > MAX_MEMBER_RESULTS
         ? `仅显示前 ${MAX_MEMBER_RESULTS} 条，共 ${matches.length} 条匹配：`
@@ -278,7 +276,7 @@ export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any
   },
 }
 
-/** 全部原生工具的定义，名称与描述固定为源插件的默认值。 */
+/** 全部原生工具的定义，名称与描述统一取自 NATIVE_TOOLS。 */
 export function nativeToolDefinitions(ctx: Context, config: Config, log: Logger): ToolDefinition[] {
   return NATIVE_TOOL_KEYS.map((key) => {
     const tool = NATIVE_TOOL_IMPLEMENTATIONS[key]
@@ -308,7 +306,7 @@ export function nativeToolDefinitions(ctx: Context, config: Config, log: Logger)
 
 /**
  * 注册原生工具。工具对所有会话全局可见（v2 的工具管理页因此能列出并开关它们），
- * 再给不在 OneBot 上的 agent 挂一层排除过滤，与源插件只在 OneBot 会话授权一致。
+ * 再给不在 OneBot 上的 agent 挂一层排除过滤。
  */
 export function registerNativeTools(ctx: Context, config: Config, log: Logger) {
   const definitions = nativeToolDefinitions(ctx, config, log)

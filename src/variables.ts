@@ -5,15 +5,11 @@ import type { Config, GroupInfoItem, MemberInfoItem, OneBotProtocol } from './co
 import { DEFAULT_GROUP_INFO_ITEMS } from './config'
 import type { Logger } from './logger'
 import {
-  asMember,
+  asRecord,
   asMembers,
   callOneBot,
   formatDate,
   formatDateTime,
-  memberCard,
-  memberNickname,
-  memberRole,
-  memberUserId,
   normalizeTimestamp,
   oneBotOf,
   pickFirst,
@@ -27,22 +23,15 @@ const SHUT_LIST_TIMEOUT_MS = 200
 const SHUT_LIST_CACHE_TTL_MS = 15_000
 
 function translateGender(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  const text = String(value).trim().toLowerCase()
-  if (!text) return ''
-  if (['male', 'man', 'm', '1', 'boy'].includes(text)) return '男'
-  if (['female', 'woman', 'f', '2', 'girl'].includes(text)) return '女'
-  if (['未知', 'unknown', '0', 'secret'].includes(text)) return ''
-  return String(value)
+  if (value === 'male') return '男'
+  if (value === 'female') return '女'
+  return ''
 }
 
 function normalizeRole(value: string): string {
-  const text = value.toLowerCase()
-  if (!text) return '群员'
-  if (['owner', 'group_owner', '群主'].includes(text)) return '群主'
-  if (['admin', 'administrator', 'group_admin', '管理员'].includes(text)) return '管理员'
-  if (['member', 'normal', '群员'].includes(text)) return '群员'
-  return value
+  if (value === 'owner') return '群主'
+  if (value === 'admin') return '管理员'
+  return !value || value === 'member' ? '群员' : value
 }
 
 /** 会话所在的 Satori 机器人，任意平台；预览等没有真实机器人的环境里为 undefined。 */
@@ -56,13 +45,21 @@ async function fetchMember(ctx: Context, env: PromptEnvironment, userId: string)
   if (!bot || !env.guildId) return undefined
   try {
     if (bot.platform === 'onebot') {
-      return asMember(await callOneBot(bot, 'get_group_member_info', {
+      return asRecord(await callOneBot(bot, 'get_group_member_info', {
         group_id: Number(env.guildId),
         user_id: Number(userId),
         no_cache: false,
       }))
     }
-    return asMember(await bot.getGuildMember(env.guildId, userId))
+    const member = await bot.getGuildMember(env.guildId, userId)
+    return {
+      user_id: member.user?.id,
+      card: pickText(member.nick, member.name),
+      nickname: member.user?.name,
+      role: member.roles?.[0]?.id,
+      title: member.title,
+      join_time: member.joinedAt,
+    }
   } catch {
     return undefined
   }
@@ -74,7 +71,7 @@ function renderMember(member: MemberInfo | undefined, items: MemberInfoItem[], i
   for (const item of items) {
     switch (item) {
       case 'nickname': {
-        const name = pickText(member?.card, member?.remark, member?.displayName, member?.nick, member?.nickname, member?.name, fallbackName, id)
+        const name = pickText(member?.card, member?.nickname, fallbackName, id)
         if (name) values.push(`name:${name}`)
         break
       }
@@ -82,20 +79,20 @@ function renderMember(member: MemberInfo | undefined, items: MemberInfoItem[], i
         if (id) values.push(`id:${id}`)
         break
       case 'role':
-        values.push(`群内身份:${normalizeRole(member ? memberRole(member) : '')}`)
+        values.push(`群内身份:${normalizeRole(pickText(member?.role))}`)
         break
       case 'level': {
-        const level = pickFirst(member?.level, member?.levelName, member?.level_name, member?.level_info?.current_level)
+        const level = pickFirst(member?.level)
         if (level !== undefined) values.push(`群等级:${level}`)
         break
       }
       case 'title': {
-        const title = pickFirst(member?.title, member?.specialTitle, member?.special_title)
+        const title = pickFirst(member?.title)
         if (title !== undefined) values.push(`头衔:${title}`)
         break
       }
       case 'gender': {
-        const gender = translateGender(member?.sex ?? member?.gender)
+        const gender = translateGender(member?.sex)
         if (gender) values.push(`性别:${gender}`)
         break
       }
@@ -105,17 +102,17 @@ function renderMember(member: MemberInfo | undefined, items: MemberInfoItem[], i
         break
       }
       case 'area': {
-        const area = pickFirst(member?.area, member?.region, member?.location)
+        const area = pickFirst(member?.area)
         if (area !== undefined) values.push(`地区:${area}`)
         break
       }
       case 'joinTime': {
-        const joinTime = formatDate(normalizeTimestamp(pickFirst(member?.join_time, member?.joined_at, member?.joinTime, member?.joinedAt)))
+        const joinTime = formatDate(normalizeTimestamp(member?.join_time))
         if (joinTime) values.push(`入群:${joinTime}`)
         break
       }
       case 'lastSentTime': {
-        const lastSentTime = formatDateTime(normalizeTimestamp(pickFirst(member?.last_sent_time, member?.lastSentTime, member?.lastSpeakTimestamp)))
+        const lastSentTime = formatDateTime(normalizeTimestamp(member?.last_sent_time))
         if (lastSentTime) values.push(`活跃:${lastSentTime}`)
         break
       }
@@ -149,16 +146,9 @@ export function botInfoProvider(ctx: Context, config: Config): VariableProvider 
 
 interface GroupInfo {
   group_id?: unknown
-  groupId?: unknown
-  id?: unknown
   group_name?: unknown
-  groupName?: unknown
-  name?: unknown
   member_count?: unknown
-  memberCount?: unknown
-  max_member_count?: unknown
   create_time?: unknown
-  createTime?: unknown
   group_create_time?: unknown
 }
 
@@ -169,12 +159,12 @@ async function fetchRoles(bot: Bot, guildId: string, log: Logger): Promise<{ own
     const owners: string[] = []
     const admins: string[] = []
     for (const member of members) {
-      const role = memberRole(member).toLowerCase()
-      const userId = memberUserId(member)
-      const name = pickText(memberCard(member), memberNickname(member)) || userId
+      const role = member.role
+      const userId = pickText(member.user_id)
+      const name = pickText(member.card, member.nickname, userId)
       const label = userId ? `${name}(${userId})` : name
-      if (['owner', 'master', 'leader'].includes(role)) owners.push(label)
-      else if (['admin', 'administrator', 'manager'].includes(role)) admins.push(label)
+      if (role === 'owner') owners.push(label)
+      else if (role === 'admin') admins.push(label)
     }
     return { owners, admins }
   } catch (error) {
@@ -184,10 +174,10 @@ async function fetchRoles(bot: Bot, guildId: string, log: Logger): Promise<{ own
 }
 
 function renderGroupInfo(group: GroupInfo, items: GroupInfoItem[], roles: { owners: string[], admins: string[] } | undefined): string {
-  const id = pickText(group.group_id, group.groupId, group.id)
-  const name = pickText(group.group_name, group.groupName, group.name)
-  const memberCount = group.member_count ?? group.memberCount ?? group.max_member_count
-  const createTime = formatDate(normalizeTimestamp(group.create_time ?? group.createTime ?? group.group_create_time))
+  const id = pickText(group.group_id)
+  const name = pickText(group.group_name)
+  const memberCount = group.member_count
+  const createTime = formatDate(normalizeTimestamp(group.create_time ?? group.group_create_time))
   const values: string[] = []
   for (const item of items) {
     switch (item) {
@@ -222,7 +212,7 @@ export function groupInfoProvider(ctx: Context, config: Config, log: Logger): Va
     if (!bot) return '暂无群信息。'
     const items = config.groupInfo.items.length ? config.groupInfo.items : DEFAULT_GROUP_INFO_ITEMS
     const group = await callOneBot(bot, 'get_group_info', { group_id: Number(env.guildId), no_cache: false })
-      .then(asMember, () => undefined)
+      .then(asRecord, () => undefined)
     if (!group) return '未能获取当前群信息。'
     const roles = items.includes('ownerList') || items.includes('adminList') ? await fetchRoles(bot, env.guildId, log) : undefined
     return renderGroupInfo(group, items, roles)
@@ -230,9 +220,6 @@ export function groupInfoProvider(ctx: Context, config: Config, log: Logger): Va
 }
 
 class ShutListTimeout extends Error {}
-
-/** 群号类型不被接受时的报错特征：NapCat 要数字、LLBot 要字符串，类型不对时换另一种再试一次。 */
-const WRONG_ID_TYPE = /string|number|type|invalid|参数/i
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -244,30 +231,19 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]).finally(() => clearTimeout(timer))
 }
 
-async function fetchShutList(bot: Bot, guildId: string, protocol: OneBotProtocol, log: Logger): Promise<unknown[]> {
-  const preferred = protocol === 'llbot' ? guildId : Number(guildId)
-  const fallback = protocol === 'llbot' ? Number(guildId) : guildId
-  const request = async (groupId: string | number) => {
-    const data = await withTimeout(callOneBot(bot, 'get_group_shut_list', { group_id: groupId }), SHUT_LIST_TIMEOUT_MS)
-    return Array.isArray(data) ? data : []
-  }
-  try {
-    return await request(preferred)
-  } catch (error) {
-    if (error instanceof ShutListTimeout || !(error instanceof Error) || !WRONG_ID_TYPE.test(error.message)) throw error
-    log.debug('group shut list retries with %s group id: %s', typeof fallback, error.message)
-    return request(fallback)
-  }
+async function fetchShutList(bot: Bot, guildId: string, protocol: OneBotProtocol): Promise<unknown[]> {
+  const groupId = protocol === 'llbot' ? guildId : Number(guildId)
+  const data = await withTimeout(callOneBot(bot, 'get_group_shut_list', { group_id: groupId }), SHUT_LIST_TIMEOUT_MS)
+  return Array.isArray(data) ? data : []
 }
 
 function renderShutItem(item: unknown): string | undefined {
-  const record = asMember(item)
+  const record = asRecord(item)
   if (!record) return undefined
-  const field = (key: string) => Reflect.get(record, key)
-  const userId = pickText(field('uin'), field('user_id'))
+  const userId = pickText(record.uin, record.user_id)
   if (!userId) return undefined
-  const name = pickText(field('cardName'), field('remark'), field('nick'), field('nickname'), userId)
-  const until = formatDateTime(normalizeTimestamp(pickFirst(field('shutUpTime'), field('shut_up_time')))) || '未知'
+  const name = pickText(record.cardName, record.remark, record.nick, record.nickname, userId)
+  const until = formatDateTime(normalizeTimestamp(pickFirst(record.shutUpTime, record.shut_up_time))) || '未知'
   return `id：${userId}，name：${name}，禁言截至：${until}`
 }
 
@@ -283,7 +259,7 @@ export function groupShutListProvider(ctx: Context, config: Config, log: Logger)
     const cached = cache.get(key)
     if (cached && cached.expiresAt > Date.now()) return cached.value
     try {
-      const lines = (await fetchShutList(bot, env.guildId, config.oneBotProtocol, log)).flatMap((item) => renderShutItem(item) ?? [])
+      const lines = (await fetchShutList(bot, env.guildId, config.oneBotProtocol)).flatMap((item) => renderShutItem(item) ?? [])
       const value = lines.length ? lines.join('\n') : '当前群暂无禁言成员。'
       cache.set(key, { value, expiresAt: Date.now() + SHUT_LIST_CACHE_TTL_MS })
       return value
@@ -303,7 +279,7 @@ export function variableDefinitions(ctx: Context, config: Config, log: Logger): 
     [config.groupInfo.variableName, 'Current group info', groupInfoProvider(ctx, config, log)],
     [config.groupShutList.variableName, 'Muted members of this group', groupShutListProvider(ctx, config, log)],
   ]
-  // 都随群聊状态变化，属于可变变量：不能写进 system 区，v1 预设会被自动挪到 context 区。
+  // 都随群聊状态变化，属于可变变量，不能写进 system 区。
   return entries
     .filter(([name]) => name.trim())
     .map(([name, description, provider]) => [{ name: name.trim(), description, mutable: true }, provider])

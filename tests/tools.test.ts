@@ -10,7 +10,7 @@ const textOf = (record: { ok: boolean, value?: unknown, error?: { message: strin
   record.ok ? record.value : record.error?.message
 
 describe('原生工具注册', () => {
-  it('全部工具按源插件的默认名称与描述注册，开关交给 v2 的工具管理', async () => {
+  it('全部工具按固定名称与描述注册，开关交给 v2 的工具管理', async () => {
     const { ctx } = await createHost()
     const tools = Object.fromEntries(ctx.tools.list().map((tool) => [tool.name, tool.description]))
     expect(Object.keys(tools)).toEqual([
@@ -18,13 +18,6 @@ describe('原生工具注册', () => {
       'handle_request', 'set_group_kick', 'set_group_special_title', 'delete_msg',
     ])
     expect(tools.set_group_kick).toBe('将指定成员踢出群聊。')
-  })
-
-  it('戳一戳、消息表情与禁言不再提供，交给 v2 自带的 OneBot 动作', async () => {
-    const { ctx } = await createHost()
-    const names = ctx.tools.list().map((tool) => tool.name)
-    expect(names).toHaveLength(9)
-    for (const name of ['poke_user', 'set_msg_emoji', 'set_group_ban']) expect(names).not.toContain(name)
   })
 
   it('不在 OneBot 会话里时报错，不调用任何机器人', async () => {

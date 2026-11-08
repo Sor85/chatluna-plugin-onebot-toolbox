@@ -42,10 +42,7 @@ export interface Config {
   debugLogging: boolean
 }
 
-/**
- * 原生工具的名称与描述，与源插件的默认值一致。插件不提供改名、改描述或开关工具的配置，
- * 工具全部注册，启用范围交给 v2 的工具管理。
- */
+/** 原生工具的名称与描述固定，全部注册；启用范围交给 v2 的工具管理。 */
 export const NATIVE_TOOLS: Record<NativeToolKey, NativeToolInfo> = {
   setSelfProfile: {
     toolName: 'set_self_profile',

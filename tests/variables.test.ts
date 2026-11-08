@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { Bot } from '@satorijs/core'
 import { createBot, createHost, failure, groupEnv } from './helpers/host'
 
 const member = {
@@ -20,10 +21,14 @@ async function render(ctx: Awaited<ReturnType<typeof createHost>>['ctx'], source
 }
 
 describe('变量注册', () => {
-  it('四个变量都注册为可变变量，随机数交给 v2 自带的 random', async () => {
+  it('四个变量都注册为可变变量', async () => {
     const { ctx } = await createHost()
-    const names = ctx.prompt.catalog().map((entry) => entry.declaration?.name ?? entry)
-    for (const name of ['userInfo', 'botInfo', 'groupInfo', 'groupShutList']) expect(JSON.stringify(names)).toContain(name)
+    expect(ctx.prompt.catalog().map(({ name, mutable }) => ({ name, mutable }))).toEqual(expect.arrayContaining([
+      { name: 'userInfo', mutable: true },
+      { name: 'botInfo', mutable: true },
+      { name: 'groupInfo', mutable: true },
+      { name: 'groupShutList', mutable: true },
+    ]))
     await expect(render(ctx, '{userInfo}', groupEnv(), 'system')).rejects.toThrow()
   })
 
@@ -48,6 +53,28 @@ describe('用户与机器人信息', () => {
     const bot = createBot('10000', { get_group_member_info: () => member })
     const { ctx } = await createHost({ userInfo: { variableName: 'userInfo', items: [] } }, [bot])
     expect(await render(ctx, '{userInfo}', groupEnv({ userId: undefined, message: { senderId: '30001' } }))).toBe('name:小明, id:30001')
+  })
+
+  it('其他平台按当前 Satori GuildMember 结构读取昵称、角色、头衔与入群时间', async () => {
+    const bot = {
+      ...createBot(),
+      platform: 'discord',
+      getGuildMember: vi.fn<Bot['getGuildMember']>().mockResolvedValue({
+        user: { id: '30000', name: 'Ming' },
+        nick: '小明',
+        roles: [{ id: 'admin' }],
+        title: '大佬',
+        joinedAt: 1700000000000,
+      }),
+    }
+    const { ctx } = await createHost({}, [bot])
+    expect(await render(ctx, '{userInfo}', groupEnv({ platform: 'discord' })))
+      .toMatch(/^name:小明, id:30000, 群内身份:管理员, 头衔:大佬, 入群:2023-11-1\d$/)
+    expect(bot.requests).toEqual([])
+    bot.getGuildMember.mockResolvedValue({ user: { id: '30000', name: 'Ming' }, name: '群内显示名' })
+    expect(await render(ctx, '{userInfo}', groupEnv({ platform: 'discord' }))).toBe('name:群内显示名, id:30000, 群内身份:群员')
+    bot.getGuildMember.mockResolvedValue({ user: { id: '30000', name: 'Ming' } })
+    expect(await render(ctx, '{userInfo}', groupEnv({ platform: 'discord' }))).toBe('name:Ming, id:30000, 群内身份:群员')
   })
 
   it('私聊与查询失败时按已知信息渲染', async () => {
@@ -87,6 +114,14 @@ describe('群信息', () => {
     expect(bot.requests.at(-1)).toEqual(['get_group_shut_list', { group_id: 20000 }])
   })
 
+  it('缺少实际人数时不把群容量当成人数', async () => {
+    const bot = createBot('10000', {
+      get_group_info: () => ({ group_id: 20000, group_name: '测试群', max_member_count: 2000 }),
+    })
+    const { ctx } = await createHost({ groupInfo: { variableName: 'groupInfo', items: ['groupName', 'memberCount'] } }, [bot])
+    expect(await render(ctx, '{groupInfo}')).toBe('群名：测试群')
+  })
+
   it('私聊为空，非 OneBot 平台给出说明，查询失败给出提示', async () => {
     const bot = createBot('10000', { get_group_info: () => failure('boom') })
     const { ctx } = await createHost({}, [bot])
@@ -97,7 +132,7 @@ describe('群信息', () => {
 })
 
 describe('群禁言列表', () => {
-  it('兼容 NapCat 与 LLBot 两种字段，结果缓存 15 秒', async () => {
+  it('读取 NapCat 与 LLBot 的禁言成员字段，结果缓存 15 秒', async () => {
     const bot = createBot('10000', {
       get_group_shut_list: () => [
         { uin: 1, cardName: '小明', shutUpTime: 1750000000 },
@@ -111,13 +146,22 @@ describe('群禁言列表', () => {
     expect(bot.requests).toEqual([['get_group_shut_list', { group_id: 20000 }]])
   })
 
-  it('LLBot 先用字符串群号，类型不被接受时换成数字再试', async () => {
-    const bot = createBot('10000', {
-      get_group_shut_list: ({ group_id }) => typeof group_id === 'string' ? failure('group_id number required') : [],
-    })
-    const { ctx } = await createHost({ oneBotProtocol: 'llbot' }, [bot])
+  it.each([
+    ['napcat', 20000],
+    ['llbot', '20000'],
+    ['snowluma', 20000],
+  ] as const)('%s 按协议使用群号类型', async (oneBotProtocol, groupId) => {
+    const bot = createBot('10000', { get_group_shut_list: () => [] })
+    const { ctx } = await createHost({ oneBotProtocol }, [bot])
     expect(await render(ctx, '{groupShutList}')).toBe('当前群暂无禁言成员。')
-    expect(bot.requests).toEqual([['get_group_shut_list', { group_id: '20000' }], ['get_group_shut_list', { group_id: 20000 }]])
+    expect(bot.requests).toEqual([['get_group_shut_list', { group_id: groupId }]])
+  })
+
+  it('群号类型错误按请求失败处理，不切换类型重试', async () => {
+    const bot = createBot('10000', { get_group_shut_list: () => failure('group_id number required') })
+    const { ctx } = await createHost({ oneBotProtocol: 'llbot' }, [bot])
+    expect(await render(ctx, '{groupShutList}')).toBe('获取群禁言列表失败。')
+    expect(bot.requests).toEqual([['get_group_shut_list', { group_id: '20000' }]])
   })
 
   it('请求超时按空列表处理，其余失败给出提示', async () => {

@@ -1,43 +1,30 @@
 import type { Context } from 'cordis'
 import type { Bot } from '@satorijs/core'
 
-/** Koishi OneBot 适配器的原始请求：返回完整的响应包，业务失败也照常 resolve。 */
-export interface OneBotInternal {
+/** OneBot 适配器的原始请求返回完整响应包，业务失败也照常 resolve。 */
+interface OneBotInternal {
   _request(action: string, params: Record<string, unknown>): Promise<unknown>
-}
-
-interface OneBotEnvelope {
-  status?: unknown
-  retcode?: unknown
-  wording?: unknown
-  message?: unknown
-  data?: unknown
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-/** 会话所在的 OneBot 机器人；不是 OneBot 会话或机器人已离线时为 undefined。 */
+/** 会话所在的 OneBot 机器人；不是 OneBot 会话或找不到机器人时为 undefined。 */
 export function oneBotOf(ctx: Context, platform: string | undefined, selfId: string | undefined): Bot | undefined {
   if (platform !== 'onebot' || selfId === undefined) return undefined
   return ctx.satori.bots.find((bot) => bot.platform === 'onebot' && bot.selfId === selfId)
 }
 
-/**
- * 调用 OneBot action 并返回 `data`。OneBot 的业务错误以正常 resolve 的响应包返回，这里按 status 与 retcode
- * 判定失败并抛出，错误信息取实现给出的 wording/message。
- */
+/** 调用 OneBot action 并返回 data，按响应包的 status 与 retcode 判定业务失败。 */
 export async function callOneBot(bot: Bot, action: string, params: Record<string, unknown>): Promise<unknown> {
   const internal: OneBotInternal = bot.internal
-  const result: unknown = await internal._request(action, params)
-  if (!isRecord(result)) return result
-  const envelope: OneBotEnvelope = result
-  const status = String(envelope.status ?? '').toLowerCase()
-  const failed = (status !== '' && status !== 'ok') || (typeof envelope.retcode === 'number' && envelope.retcode !== 0)
-  if (!failed) return envelope.data
-  const reason = envelope.wording || envelope.message || envelope.status
-  const retcode = typeof envelope.retcode === 'number' ? ` (retcode: ${envelope.retcode})` : ''
-  throw new Error(`${reason ? String(reason) : 'OneBot returned failed'}${retcode}`)
+  const result = await internal._request(action, params)
+  if (!isRecord(result) || typeof result.status !== 'string' || typeof result.retcode !== 'number') {
+    throw new Error('Invalid OneBot response envelope')
+  }
+  if (result.status === 'ok' && result.retcode === 0) return result.data
+  const reason = result.wording || result.message || result.status || 'OneBot returned failed'
+  throw new Error(`${String(reason)} (retcode: ${result.retcode})`)
 }
 
 /**
@@ -62,7 +49,7 @@ export function pickText(...values: unknown[]): string {
   return String(pickFirst(...values) ?? '').trim()
 }
 
-/** OneBot 时间戳可能是秒或毫秒，统一成毫秒；空值与 0 视为没有。 */
+/** OneBot 使用秒，Satori 使用毫秒，统一成毫秒；空值与 0 视为没有。 */
 export function normalizeTimestamp(raw: unknown): number | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined
   const numeric = Number(raw)
@@ -86,68 +73,25 @@ export function formatDateTime(value: number | undefined): string {
   return `${day} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-/** 群成员信息的常见字段；各 OneBot 实现与 Satori 的字段名不同，读取时逐个尝试。 */
+/** OneBot 群成员信息；其他平台的 Satori 成员信息在查询入口显式转换。 */
 export interface MemberInfo {
   user_id?: unknown
-  userId?: unknown
-  id?: unknown
-  qq?: unknown
-  uid?: unknown
   role?: unknown
-  roleName?: unknown
-  permission?: unknown
-  identity?: unknown
-  roles?: unknown
   card?: unknown
-  remark?: unknown
-  displayName?: unknown
-  nick?: unknown
   nickname?: unknown
-  name?: unknown
   level?: unknown
-  levelName?: unknown
-  level_name?: unknown
-  level_info?: { current_level?: unknown }
   title?: unknown
-  specialTitle?: unknown
-  special_title?: unknown
   sex?: unknown
-  gender?: unknown
   age?: unknown
   area?: unknown
-  region?: unknown
-  location?: unknown
   join_time?: unknown
-  joined_at?: unknown
-  joinTime?: unknown
-  joinedAt?: unknown
   last_sent_time?: unknown
-  lastSentTime?: unknown
-  lastSpeakTimestamp?: unknown
-  user?: { nick?: unknown, nickname?: unknown, name?: unknown }
 }
 
 export function asMembers(value: unknown): MemberInfo[] {
   return Array.isArray(value) ? value.filter(isRecord) : []
 }
 
-export function asMember(value: unknown): MemberInfo | undefined {
+export function asRecord(value: unknown): Record<string, unknown> | undefined {
   return isRecord(value) ? value : undefined
-}
-
-export function memberUserId(member: MemberInfo): string {
-  return pickText(member.user_id, member.userId, member.id, member.qq, member.uid)
-}
-
-export function memberCard(member: MemberInfo): string {
-  return pickText(member.card, member.remark, member.displayName)
-}
-
-export function memberNickname(member: MemberInfo): string {
-  return pickText(member.nick, member.nickname, member.name, member.user?.nickname, member.user?.name)
-}
-
-export function memberRole(member: MemberInfo): string {
-  const roles = Array.isArray(member.roles) ? member.roles : []
-  return pickText(member.role, member.roleName, member.permission, member.identity, roles[0])
 }

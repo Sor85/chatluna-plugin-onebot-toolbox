@@ -1,10 +1,9 @@
 import { Context } from 'cordis'
 import { Satori } from '@satorijs/core'
 import type { PromptEnvironment } from '@chatluna/prompt'
-import type {} from '@chatluna/tool'
 import * as toolbox from '../../src'
 
-export type Responder = (params: Record<string, unknown>) => unknown
+type Responder = (params: Record<string, unknown>) => unknown
 
 /** 假的 OneBot 机器人：记录每个 action 的参数，按 action 返回预设的 OneBot 响应包。 */
 export function createBot(selfId = '10000', responders: Record<string, Responder> = {}) {
@@ -13,7 +12,6 @@ export function createBot(selfId = '10000', responders: Record<string, Responder
     platform: 'onebot',
     selfId,
     requests,
-    responders,
     internal: {
       async _request(action: string, params: Record<string, unknown>) {
         requests.push([action, params])
@@ -26,10 +24,10 @@ export function createBot(selfId = '10000', responders: Record<string, Responder
   return bot
 }
 
-export type FakeBot = ReturnType<typeof createBot>
+type FakeBot = ReturnType<typeof createBot>
 
 /** responder 返回它时，原样作为整个响应包返回，用来模拟 OneBot 的业务失败。 */
-export class Envelope {
+class Envelope {
   constructor(readonly value: unknown) {}
 }
 

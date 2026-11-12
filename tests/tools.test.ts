@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { fileRefTableOf, type ChatFileBlock, type ChatMessage } from '@chatluna/message'
+import type { ChatFileBlock, ChatMessage } from '@chatluna/message'
+import { fileRefTableOf } from '@chatluna/transform'
 import { createBot, createHost, failure, groupLocation } from './helpers/host'
 
 async function call(ctx: Awaited<ReturnType<typeof createHost>>['ctx'], name: string, args: Record<string, unknown>, location: Record<string, unknown> = groupLocation) {

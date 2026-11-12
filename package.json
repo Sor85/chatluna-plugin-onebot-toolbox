@@ -1,6 +1,6 @@
 {
   "name": "chatluna-plugin-onebot-toolbox",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "为 ChatLuna 提供 OneBot 原生工具与群聊信息变量：修改资料与头像、群名片与头衔、搜索群成员、退群、踢人、处理申请、撤回消息",
   "type": "module",
   "license": "MIT",

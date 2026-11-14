@@ -138,7 +138,7 @@ export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any
         // LLBot 的 set_qq_profile 不接受 sex。
         ...(args.gender && scope.protocol !== 'llbot' ? { sex: GENDERS[args.gender] } : {}),
       })
-      return '机器人资料已更新。'
+      return '资料已更新。'
     },
   },
   setQQAvatar: {
@@ -261,17 +261,6 @@ export const NATIVE_TOOL_IMPLEMENTATIONS: { [K in NativeToolKey]: NativeTool<any
       const title = args.title.trim()
       await callOneBot(scope.bot, 'set_group_special_title', { group_id: groupId, user_id: userId, special_title: title })
       return title ? `群专属头衔已更新：${userId} -> ${title}` : `群专属头衔已清除：${userId}`
-    },
-  },
-  deleteMessage: {
-    args: Schema.args({
-      message_id: Schema.string().min(1).description('Specific message ID to delete.'),
-    }),
-    effect: 'write',
-    async run(scope, args: { message_id: string }) {
-      const messageId = required(args.message_id, 'message_id')
-      await callOneBot(scope.bot, 'delete_msg', { message_id: numericId(messageId) })
-      return `Message deleted by ID ${messageId}.`
     },
   },
 }

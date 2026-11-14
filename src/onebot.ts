@@ -27,12 +27,9 @@ export async function callOneBot(bot: Bot, action: string, params: Record<string
   throw new Error(`${String(reason)} (retcode: ${result.retcode})`)
 }
 
-/**
- * 整数形式的 ID 转成数字，其余原样保留；OneBot 实现普遍要求数字形式的群号、QQ 号与消息 ID。
- * SnowLuma 的 message_id 是 int32 哈希，常为负数，所以带负号的整数同样转换。
- */
+/** 纯数字的 ID 转成数字，其余原样保留；OneBot 实现普遍要求数字形式的群号与 QQ 号。 */
 export function numericId(value: string): string | number {
-  return /^-?\d+$/.test(value) ? Number(value) : value
+  return /^\d+$/.test(value) ? Number(value) : value
 }
 
 /** 取第一个非空值（去掉首尾空白后不为空字符串），保留原始类型。 */

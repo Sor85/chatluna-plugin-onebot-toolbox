@@ -11,7 +11,7 @@ ChatLuna v2 外部插件：为 ChatLuna 提供 OneBot 原生工具与群聊信�
 ## 目录
 
 - `src/config.ts`：配置。`Config` 是分组的 intersect（基础设置、变量、其他设置），由 v2 插件设置页直接渲染；`NATIVE_TOOLS` 是每个工具固定的名称与描述。
-- `src/tools.ts`：9 个原生工具（`NATIVE_TOOL_IMPLEMENTATIONS`）与注册。
+- `src/tools.ts`：8 个原生工具（`NATIVE_TOOL_IMPLEMENTATIONS`）与注册。
 - `src/variables.ts`：`userInfo`、`botInfo`、`groupInfo`、`groupShutList` 四个变量。
 - `src/requests.ts`：申请通知。
 - `src/onebot.ts`：机器人查找、OneBot action 调用（`callOneBot`）与成员字段读取。
@@ -19,13 +19,13 @@ ChatLuna v2 外部插件：为 ChatLuna 提供 OneBot 原生工具与群聊信�
 
 ## 约定
 
-- 戳一戳、消息表情、禁言由 v2 自带的 `@chatluna/chat-onebot` 动作（`<poke/>`、`<react/>`、`<mute/>`）提供；`random` 变量也由 v2 提供，本插件不重复注册。
-- 插件不提供编辑工具的配置（开关、改名、改描述），交给 v2 的工具管理：9 个工具在插件启用时全部按 `NATIVE_TOOLS` 的名称与描述注册。
+- 戳一戳、消息表情、禁言、撤回消息由 v2 自带的 `@chatluna/chat-onebot` 提供（前三者是 `<poke/>`、`<react/>`、`<mute/>` 动作）；`random` 变量也由 v2 提供，本插件不重复注册。
+- 插件不提供编辑工具的配置（开关、改名、改描述），交给 v2 的工具管理：8 个工具在插件启用时全部按 `NATIVE_TOOLS` 的名称与描述注册。
 - 工具全局注册（v2 工具管理页才能列出），再在 `chatluna/agent-open` 时给不在 OneBot 上的 agent 挂 `tools.filter({ exclude })`；`agents` 是可选服务，没有时工具对所有会话可见、调用时报不支持。
 - 工具的执行上下文取 `call.location`（platform、selfId、guild、isDirect），机器人经 `ctx.satori.bots` 按 selfId 查找，不经 `chat.inbound`。失败一律抛 Error（消息为 `<工具名> failed: <原因>`），v2 只把 message 交给模型。OneBot 的业务失败以正常 resolve 的响应包返回，统一经 `callOneBot` 按 status/retcode 判定，不用适配器的 `_get`。
-- 群号、QQ 号多数以字符串提交，`delete_msg`、`get_group_member_list`、成员与群信息查询转成数字；LLBot 的 `set_qq_profile` 不带 `sex`；`get_group_shut_list` 按协议使用 NapCat/SnowLuma 的数字或 LLBot 的字符串群号，不猜测其他类型重试，200ms 超时按空列表处理。
+- 群号、QQ 号多数以字符串提交，`get_group_member_list`、`set_friend_remark`、成员与群信息查询转成数字；LLBot 的 `set_qq_profile` 不带 `sex`；`get_group_shut_list` 按协议使用 NapCat/SnowLuma 的数字或 LLBot 的字符串群号，不猜测其他类型重试，200ms 超时按空列表处理。
 - 成员与群信息只读取 OneBot 正式字段，不猜测 camelCase、Satori 或历史字段别名；其他平台的 `GuildMember` 在 `fetchMember` 入口按当前 Satori 类型显式转换。群人数只用 `member_count`，不能用容量 `max_member_count` 代替。
-- SnowLuma：`set_friend_add_request` 不读 `remark`，同意后另调 `set_friend_remark`（申请通知因此把 `userId` 写进唤醒原因）；`message_id` 是常为负数的 int32 哈希，`numericId` 接受带负号的整数；`get_group_info` 的创建时间字段是 `group_create_time`。`get_group_shut_list` 返回 `{user_id, nickname, shut_up_time}`，由 `renderShutItem` 与 NapCat/LLBot 的字段差异一并处理。
+- SnowLuma：`set_friend_add_request` 不读 `remark`，同意后另调 `set_friend_remark`（申请通知因此把 `userId` 写进唤醒原因）；`get_group_info` 的创建时间字段是 `group_create_time`。`get_group_shut_list` 返回 `{user_id, nickname, shut_up_time}`，由 `renderShutItem` 与 NapCat/LLBot 的字段差异一并处理。
 - 权限不另定义，走 v2 默认的 `tool:<名称>`（`search_group_member` 是 read，其余是 write）。
 - 头像工具的图片来源：v2 不把聊天图片的地址交给模型，只给 `<img ref="i…"/>` 占位符，所以 `imageUrl` 除了 HTTP/HTTPS 与本地路径还接受 ref。ref 用 `@chatluna/transform` 的 `fileRefTableOf(call.agent.session.messages()).resolve(ref)` 解析（与 v2 的 `look` 工具同一张表，该运行时依赖列入 peerDependencies），取原图 `data` 而不是 `preview`；`storage://` 引用经可选服务 `chatluna_storage` 的 `getTempFile` 读出字节，不写进 `inject`（没装存储插件时会话里只有 url 或 data 块）。读出的图片一律转成 `base64://` 提交。
 - 变量都声明为 `mutable: true`：随群聊状态变化，写在 system 区会报 `MutableVariableError`。provider 拿不到 Session，只有 `PromptEnvironment`；群聊里 `env.userId` 只来自本步最新的用户消息，退回 `env.message.senderId`。变量名被其他插件占用时只跳过该变量并记 warn。

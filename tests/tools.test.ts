@@ -16,9 +16,9 @@ describe('原生工具注册', () => {
     const tools = Object.fromEntries(ctx.tools.list().map((tool) => [tool.name, tool.description]))
     expect(Object.keys(tools)).toEqual([
       'set_self_profile', 'set_qq_avatar', 'set_group_card', 'search_group_member', 'set_group_leave',
-      'handle_request', 'set_group_kick', 'set_group_special_title', 'delete_msg',
+      'handle_request', 'set_group_kick', 'set_group_special_title',
     ])
-    expect(tools.set_group_kick).toBe('将指定成员踢出群聊。')
+    expect(tools.set_group_kick).toBe('将指定成员踢出群聊。需要自己是群管理员或群主才能使用。')
   })
 
   it('不在 OneBot 会话里时报错，不调用任何机器人', async () => {
@@ -33,7 +33,7 @@ describe('原生工具注册', () => {
 describe('原生工具调用', () => {
   it('修改资料：LLBot 不发送性别', async () => {
     const napcat = await createHost()
-    expect(textOf(await call(napcat.ctx, 'set_self_profile', { nickname: 'Luna', signature: 'hi', gender: 'female' }))).toBe('机器人资料已更新。')
+    expect(textOf(await call(napcat.ctx, 'set_self_profile', { nickname: 'Luna', signature: 'hi', gender: 'female' }))).toBe('资料已更新。')
     expect(napcat.bot.requests).toEqual([['set_qq_profile', { nickname: 'Luna', personal_note: 'hi', sex: '2' }]])
     const llbot = await createHost({ oneBotProtocol: 'llbot' })
     await call(llbot.ctx, 'set_self_profile', { nickname: 'Luna', gender: 'male' })
@@ -138,27 +138,18 @@ describe('原生工具调用', () => {
     ])
   })
 
-  it('撤回消息：纯数字的消息 ID 以数字提交', async () => {
-    const { ctx, bot } = await createHost()
-    expect(textOf(await call(ctx, 'delete_msg', { message_id: '123' }))).toBe('Message deleted by ID 123.')
-    await call(ctx, 'delete_msg', { message_id: 'abc' })
-    expect(bot.requests).toEqual([['delete_msg', { message_id: 123 }], ['delete_msg', { message_id: 'abc' }]])
-  })
-
-  it('SnowLuma：同意好友申请后另用 set_friend_remark 设置备注，负数消息 ID 以数字提交', async () => {
+  it('SnowLuma：同意好友申请后另用 set_friend_remark 设置备注', async () => {
     const { ctx, bot } = await createHost({ oneBotProtocol: 'snowluma' })
     expect(textOf(await call(ctx, 'handle_request', { requestType: 'friend', flag: 'u_abc', approve: true, remark: '朋友', userId: '1' })))
       .toBe('已同意好友申请 u_abc。备注已设置为 朋友。')
     expect(textOf(await call(ctx, 'handle_request', { requestType: 'friend', flag: 'u_def', approve: true, remark: '朋友' })))
       .toBe('已同意好友申请 u_def。未提供申请人 userId，备注未设置。')
     await call(ctx, 'handle_request', { requestType: 'friend', flag: 'u_ghi', approve: false, remark: '朋友', userId: '2' })
-    await call(ctx, 'delete_msg', { message_id: '-123456' })
     expect(bot.requests).toEqual([
       ['set_friend_add_request', { flag: 'u_abc', approve: true, remark: '朋友' }],
       ['set_friend_remark', { user_id: 1, remark: '朋友' }],
       ['set_friend_add_request', { flag: 'u_def', approve: true, remark: '朋友' }],
       ['set_friend_add_request', { flag: 'u_ghi', approve: false, remark: '朋友' }],
-      ['delete_msg', { message_id: -123456 }],
     ])
   })
 
@@ -191,6 +182,6 @@ describe('原生工具只在 OneBot 会话中可见', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     ctx.emit('chatluna/agent-open', { agent: onebot, kind: 'create' } as never)
     expect(ctx.tools.list(web)).toEqual([])
-    expect(ctx.tools.list(onebot).map((tool) => tool.name)).toHaveLength(9)
+    expect(ctx.tools.list(onebot).map((tool) => tool.name)).toHaveLength(8)
   })
 })

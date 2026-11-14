@@ -18,10 +18,9 @@ ChatLuna v2 插件：为 ChatLuna 提供 OneBot（QQ）原生工具与群聊信�
 | 处理好友与群申请 | `handle_request` | `set_friend_add_request` / `set_group_add_request` |
 | 踢出群成员 | `set_group_kick` | `set_group_kick` |
 | 修改群成员专属头衔 | `set_group_special_title` | `set_group_special_title` |
-| 撤回消息 | `delete_msg` | `delete_msg` |
 
 - QQ 头像工具接受会话里的图片（聊天中发送的图片可直接设为头像）、HTTP/HTTPS 链接或 OneBot 端可读的本地路径；会话图片与 HTTP/HTTPS 图片先读成 OneBot `base64://` 文件再提交，避免 OneBot 端访问不到临时图片地址。会话图片从 ChatLuna 的文件存储读取，存储中的临时文件过期后需重新发送。
-- SnowLuma 同意好友申请时不读取备注，插件在同意后另用 `set_friend_remark` 设置；它的消息 ID 常为负数，撤回消息工具按原样提交。
+- SnowLuma 同意好友申请时不读取备注，插件在同意后另用 `set_friend_remark` 设置。
 - 收到好友申请、加群申请或群邀请时插件会唤醒对应会话，把申请 flag 告诉模型，由 `handle_request` 处理：好友申请与群邀请发往申请人的私聊，加群申请发往所申请的群。在 ChatLuna 工具管理中禁用 `handle_request` 后不再唤醒；也可在设置中单独关闭「申请通知」。
 - 工具默认对所有用户开放；如需收紧，在 ChatLuna 的权限页按 `tool:<工具名>` 设置。
 

@@ -11,7 +11,6 @@ export type NativeToolKey =
   | 'handleRequest'
   | 'setGroupKick'
   | 'setGroupSpecialTitle'
-  | 'deleteMessage'
 
 export interface NativeToolInfo {
   toolName: string
@@ -50,11 +49,11 @@ export const NATIVE_TOOLS: Record<NativeToolKey, NativeToolInfo> = {
   },
   setQQAvatar: {
     toolName: 'set_qq_avatar',
-    description: '修改机器人 QQ 头像。imageUrl 填会话里图片的 ref（`<img ref="i…"/>` 的 ref 属性）、HTTP/HTTPS 链接或 OneBot 端可读的本地路径；会话图片与 HTTP/HTTPS 图片会先由插件读取并转为 OneBot base64 文件，避免临时 URL 过期或 OneBot 端无法访问。',
+    description: '修改自己的 QQ 头像。imageUrl 填会话里图片的 ref（`<img ref="i…"/>` 的 ref 属性）、HTTP/HTTPS 链接或 OneBot 端可读的本地路径；会话图片与 HTTP/HTTPS 图片会先由插件读取并转为 OneBot base64 文件，避免临时 URL 过期或 OneBot 端无法访问。',
   },
   setGroupCard: {
     toolName: 'set_group_card',
-    description: '修改群成员的群昵称。',
+    description: '修改群成员的群昵称。需要自己是群管理员或群主才能使用。',
   },
   searchGroupMember: {
     toolName: 'search_group_member',
@@ -62,7 +61,7 @@ export const NATIVE_TOOLS: Record<NativeToolKey, NativeToolInfo> = {
   },
   leaveGroup: {
     toolName: 'set_group_leave',
-    description: '让机器人退出当前群聊。',
+    description: '退出当前群聊。',
   },
   handleRequest: {
     toolName: 'handle_request',
@@ -70,15 +69,11 @@ export const NATIVE_TOOLS: Record<NativeToolKey, NativeToolInfo> = {
   },
   setGroupKick: {
     toolName: 'set_group_kick',
-    description: '将指定成员踢出群聊。',
+    description: '将指定成员踢出群聊。需要自己是群管理员或群主才能使用。',
   },
   setGroupSpecialTitle: {
     toolName: 'set_group_special_title',
     description: '修改或清除群成员的 QQ 群专属头衔。',
-  },
-  deleteMessage: {
-    toolName: 'delete_msg',
-    description: '根据消息 ID 撤回指定消息。',
   },
 }
 
